@@ -28,7 +28,7 @@ import org.bgi.flexlab.gaea.data.structure.alignment.AlignmentsBasic;
 import org.bgi.flexlab.gaea.data.structure.pileup.ReadsPool;
 import org.bgi.flexlab.gaea.data.structure.reference.ReferenceShare;
 import org.bgi.flexlab.gaea.data.structure.variant.VariantCallContext;
-import org.bgi.flexlab.gaea.tools.genotyer.VariantCallingEngine;
+import org.bgi.flexlab.gaea.tools.haplotypecaller.HaplotypeCallerEngine;
 import org.bgi.flexlab.gaea.util.Window;
 import org.seqdoop.hadoop_bam.VariantContextWritable;
 
@@ -57,7 +57,7 @@ public class HaplotypeCallerReducer extends Reducer<WindowsBasedWritable, Alignm
     /**
      * variant calling engine
      */
-    private VariantCallingEngine engine;
+    private HaplotypeCallerEngine engine;
 
     /**
      * output writable
