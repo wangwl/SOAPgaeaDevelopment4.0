@@ -22,6 +22,7 @@ import org.bgi.flexlab.gaea.data.exception.UserException;
 import org.bgi.flexlab.gaea.data.mapreduce.options.HadoopOptions;
 import org.bgi.flexlab.gaea.data.options.GaeaOptions;
 import org.bgi.flexlab.gaea.tools.genotyer.VariantCallingEngine;
+import org.bgi.flexlab.gaea.tools.haplotypecaller.HaplotypeCallerEngine;
 import org.bgi.flexlab.gaea.tools.genotyer.genotypeLikelihoodCalculator.GenotypeLikelihoodCalculator;
 import org.bgi.flexlab.gaea.tools.genotyer.genotypeLikelihoodCalculator.SNPGenotypeLikelihoodCalculator;
 import org.bgi.flexlab.gaea.tools.genotyer.genotypecaller.AFCalcFactory;
@@ -29,11 +30,9 @@ import org.bgi.flexlab.gaea.util.GaeaVariantContextUtils;
 import org.bgi.flexlab.gaea.util.pairhmm.PairHMM;
 import org.seqdoop.hadoop_bam.SAMFormat;
 import org.seqdoop.hadoop_bam.VCFFormat;
-
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.bgi.flexlab.gaea.tools.genotyer.VariantCallingEngine.OUTPUT_MODE.EMIT_VARIANTS_ONLY;
+import static org.bgi.flexlab.gaea.tools.haplotypecaller.HaplotypeCallerEngine.OUTPUT_MODE.EMIT_VARIANTS_ONLY;
 
 /**
  * Created by wangwl on 2017/5/18.
@@ -79,7 +78,7 @@ public class HaplotypeCallerOptions extends GaeaOptions implements HadoopOptions
     /**
      * models for genotype likelihood calculator
      */
-    private GenotypeLikelihoodCalculator.Model gtlcalculators = GenotypeLikelihoodCalculator.Model.SNP;
+    // private GenotypeLikelihoodCalculator.Model gtlcalculators = GenotypeLikelihoodCalculator.Model.SNP;
 
     /**
      * min depth for genotype likelihood calculation
@@ -104,7 +103,7 @@ public class HaplotypeCallerOptions extends GaeaOptions implements HadoopOptions
     /**
      * output mode
      */
-    private VariantCallingEngine.OUTPUT_MODE outputMode = EMIT_VARIANTS_ONLY;
+    private HaplotypeCallerEngine.OUTPUT_MODE outputMode = EMIT_VARIANTS_ONLY;
 
     /**
      * Maximum fraction of reads with deletions spanning this locus for it to be callable
@@ -183,7 +182,7 @@ public class HaplotypeCallerOptions extends GaeaOptions implements HadoopOptions
      * The expected heterozygosity value used to compute prior likelihoods for any locus. The default priors are:
      * het = 1e-3, P(hom-ref genotype) = 1 - 3 * het / 2, P(het genotype) = het, P(hom-var genotype) = het / 2
      */
-    private Double heterozygosity = VariantCallingEngine.HUMAN_SNP_HETEROZYGOSITY;
+    private Double heterozygosity = HaplotypeCallerEngine.HUMAN_SNP_HETEROZYGOSITY;
 
     /**
      * Standard deviation of eterozygosity for SNP and indel calling.
@@ -239,29 +238,74 @@ public class HaplotypeCallerOptions extends GaeaOptions implements HadoopOptions
         addOption("B","is_bcf_output", false, "output variant in BCF format." );
         addOption("b", "bed_file", true, "only variant in this region will be called.");
         addOption("r", "reference", true, "Gaea Indexed reference list for memory sharing.");
+        addOption("ARO", "activeRegionOut", true, "Output the active region to this IGV formatted file.");
+        addOption("APO", "activityProfileOut", true, "Output the raw activity profile results in IGV format");
+        addOption("graph", "graphOutput", true, "Write debug assembly graph information to this file");
         addOption("A", "annotation", true, "One or more specific annotations to apply to variant calls, the tag is separated by \',\'");
         addOption("contamination", "contamination_fraction_to_filter", true, "Fraction of contamination to aggressively remove.");
-        addOption("glm", "genotype_likelihoods_model", true, "Genotype likelihoods calculation model to employ -- SNP is the default option, while INDEL is also available for calling indels and BOTH is available for calling both together.");
+        addOption("gt_mode", "genotyping_mode", true, "Specifies how to determine the alternate alleles to use for genotyping");
         addOption("G", "group", true, "One or more classes/groups of annotations to apply to variant calls. The single value 'none' removes the default group, the group tag is separated by \',\'");
         addOption("hets", "heterozygosity", true, "Heterozygosity value used to compute prior likelihoods for any locus.");
         addOption("heterozygosityStandardDeviation", "heterozygosity_stdev", true, "\tStandard deviation of eterozygosity for SNP and indel calling.");
         addOption("indelHeterozygosity", "indel_heterozygosity", true, "Heterozygosity for indel calling.");
-        addOption("deletions", "max_deletion_fraction", true, "Maximum fraction of reads with deletions spanning this locus for it to be callable.");
+        //addOption("deletions", "max_deletion_fraction", true, "Maximum fraction of reads with deletions spanning this locus for it to be callable.");
+        addOption("maxReads", "maxReadsInRegionPerSample", true, "Maximum reads in an active region");
         addOption("mbq", "min_base_quality_score", true, "Minimum base quality required to consider a base for calling.");
-        addOption("mmq", "min_mapping_quality_score", true, "Minimum mapping quality required to consider a read for calling.");
-        addOption("minIndelCnt", "min_indel_count_for_genotyping", true, "Minimum number of consensus indels required to trigger genotyping run.");
-        addOption("minIndelFrac", "min_indel_fraction_per_sample", true, "Minimum fraction of all reads at a locus that must contain an indel (of any allele) for that sample to contribute to the indel count for alleles.");
-        addOption("pairHMM", "pair_hmm_implementation", true, "The PairHMM implementation to use for -glm INDEL genotype likelihood calculations");
-        addOption("pcrError", "pcr_error_rate", true, "The PCR error rate to be used for computing fragment-based likelihoods.");
+        //addOption("mmq", "min_mapping_quality_score", true, "Minimum mapping quality required to consider a read for calling.");
+        addOption("minReadsPerAlignStart", "minReadsPerAlignmentStart", true, "Minimum number of reads sharing the same alignment start for each genomic location in an active region");
+        addOption("sn", "sample_name", true, "Name of single sample to use from a multi-sample bam");
+        //addOption("minIndelCnt", "min_indel_count_for_genotyping", true, "Minimum number of consensus indels required to trigger genotyping run.");
+        //addOption("minIndelFrac", "min_indel_fraction_per_sample", true, "Minimum fraction of all reads at a locus that must contain an indel (of any allele) for that sample to contribute to the indel count for alleles.");
+        //addOption("pairHMM", "pair_hmm_implementation", true, "The PairHMM implementation to use for -glm INDEL genotype likelihood calculations");
+        //addOption("pcrError", "pcr_error_rate", true, "The PCR error rate to be used for computing fragment-based likelihoods.");
         addOption("ploidy", "sample_ploidy", true, "Ploidy per sample. For pooled data, set to (Number of samples in each pool * Sample Ploidy).");
         addOption("standCallConf", "standardConfidenceForCalling", true, "standard confidence for calling");
-        addOption("standEmitConf", "standardConfidenceForEmitting", true, "standard confidence for emitting");
-        addOption("AFmodel", "Allele_frequency_model", true, "allele frequency calculation model");
-        addOption("indelGCP", "indelGapContinuationPenalty", true, "Indel gap continuation penalty, as Phred-scaled probability. I.e., 30 => 10^-30/10");
-        addOption("indelGOP", "indelGapOpenPenalty", true, "Indel gap open penalty, as Phred-scaled probability. I.e., 30 => 10^-30/10.");
-        addOption("maxAltAlleles", "max_alternate_alleles", true, "max alternate alleles");
-        addOption("maxGT", "max_genotype_count", true, "Maximum number of genotypes to consider at any site.");
+        addOption("nda", "annotateNDA", false, "Annotate number of alleles observed");
+        addOption("newQual", "useNewAFCalculator", false, "Use new AF model instead of the so-called exact model");
+        //addOption("standEmitConf", "standardConfidenceForEmitting", true, "standard confidence for emitting");
+        addOption("AR", "activeRegionIn", true, "Use this interval list file as the active regions to process");
+        addOption("comp", "comp", true, "Comparison VCF file");
+        addOption("bamout", "bamOutput", true, "File to which assembled haplotypes should be written");
+        addOption("ActProbThresh", "activeProbabilityThreshold", true, "Threshold for the probability of a profile state being active.");
+        addOption("actRegionExtension", "activeRegionExtension", true, "The active region extension; if not provided defaults to Walker annotated default");
+        addOption("actRegionMax", "activeRegionMaxSize", true, "The active region maximum size; if not provided defaults to Walker annotated default");
+        addOption("bamWriterType", "bamWriterType", true, "Which haplotypes should be written to the BAM");
+        addOption("bandPassSigma", "bandPassSigma", true, "The sigma of the band pass filter Gaussian kernel; if not provided defaults to Walker annotated default");
+        addOption("contaminationFile", "contamination_fraction_per_sample_file", true, "Contamination per sample");
+        addOption("ERC", "emitRefConfidence", false, "Mode for emitting reference confidence scores");
+        addOption("XA", "excludeAnnotation", true, "One or more specific annotations to exclude");
+        addOption("gcpHMM", "gcpHMM", true, "Flat gap continuation penalty for use in the Pair HMM");
+        addOption("GQB", "GVCFGQBands", true, "Exclusive upper bounds for reference confidence GQ bands (must be in [1, 100] and specified in increasing order)");
+        addOption("ERCIS", "indelSizeToEliminateInRefModel", true, "The size of an indel to check for in the reference model");
+        addOption("inputPrior", "input_prior", true, "Input prior for calls");
+        addOption("kmerSize", "kmerSize", true, "Kmer size to use in the read threading assembler");
+        addOption("maxAltAlleles", "max_alternate_alleles", true, "Maximum number of alternate alleles to genotype");
+        addOption("maxGT", "max_genotype_count", true, "Maximum number of genotypes to consider at any site");
         addOption("maxNumPLValues", "max_num_PL_values", true, "Maximum number of PL values to output");
+        addOption("maxNumHaplotype", "maxNumHaplotypesInPopulation", true, "Maximum number of haplotypes to consider for your population");
+        addOption("maxReadsPerSample", "maxReadsInMemoryPerSample", true, "Maximum reads per sample given to traversal map() function");
+        addOption("maxTotalReads", "maxTotalReadsInMemory", true, "Maximum total reads given to traversal map() function");
+        addOption("minDangling", "minDanglingBranchLength", true, "Minimum length of a dangling branch to attempt recovery");
+        addOption("minPruning", "minPruning", true, "Minimum support to not prune paths in the graph");
+        addOption("numPruningSamples", "numPruningSamples", true, "Number of samples that must pass the minPruning threshold");
+        addOption("out_mode", "output_mode", true, "Which type of calls we should output");
+        addOption("pcrModel", "pcr_indel_model", true, "The PCR indel model to use");
+        addOption("globalMAPQ", "phredScaledGlobalReadMismappingRate", true, "The global assumed mismapping rate for reads");
+        addOption("allowNonUniqueKmers", "allowNonUniqueKmersInRef", false, "Allow graphs that have non-unique kmers in the reference");
+        addOption("allSitePLs", "allSitePLs", false, "Annotate all sites with PLs");
+        addOption("consensus", "consensus", false, "1000G consensus mode");
+        addOption("debug", "debug", false, "Print out very verbose debug information about each triggering active region");
+        addOption("disableOptimizations", "disableOptimizations", false, "Don't skip calculations in ActiveRegions with no variants");
+        addOption("doNotRunPhysicalPhasing", "doNotRunPhysicalPhasing", false, "Disable physical phasing");
+        addOption("dontIncreaseKmerSizesForCycles", "dontIncreaseKmerSizesForCycles", false, "Disable iterating over kmer sizes when graph cycles are detected");
+        addOption("dontTrimActiveRegions", "dontTrimActiveRegions", false, "If specified, we will not trim down the active region from the full region (active + extension) to just the active interval for genotyping");
+        addOption("dontUseSoftClippedBases", "dontUseSoftClippedBases", false, "Do not analyze soft clipped bases in the reads");
+        addOption("edr", "emitDroppedReads", false, "Emit reads that are dropped for filtering, trimming, realignment failure");
+        addOption("forceActive", "forceActive", false, "If provided, all bases will be tagged as active");
+        addOption("allelesTrigger", "useAllelesTrigger", false, "Use additional trigger on variants found in an external alleles file");
+        addOption("useFilteredReadsForAnnotations", "useFilteredReadsForAnnotations", false, "Use the contamination-filtered read maps for the purposes of annotating variants");
+        //addOption("indelGCP", "indelGapContinuationPenalty", true, "Indel gap continuation penalty, as Phred-scaled probability. I.e., 30 => 10^-30/10");
+        //addOption("indelGOP", "indelGapOpenPenalty", true, "Indel gap open penalty, as Phred-scaled probability. I.e., 30 => 10^-30/10.");
         addOption("S", "single_sample_mode", false, "will call genotype and variant for each sample separately");
         addOption("D", "minDepth", true, "minimum depth for variant calling.");
         addOption("C", "noCapBaseQualsAtMappingQual", false, "do not cap base quality at mapping quality");
