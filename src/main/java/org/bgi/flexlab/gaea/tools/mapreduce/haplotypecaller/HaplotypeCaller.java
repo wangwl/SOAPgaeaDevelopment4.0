@@ -31,13 +31,11 @@ import org.bgi.flexlab.gaea.data.structure.bam.filter.GenotyperFilter;
 import org.bgi.flexlab.gaea.framework.tools.mapreduce.BioJob;
 import org.bgi.flexlab.gaea.framework.tools.mapreduce.ToolsRunner;
 import org.bgi.flexlab.gaea.framework.tools.mapreduce.WindowsBasedAlignmentMapper;
-import org.bgi.flexlab.gaea.tools.genotyer.VariantCallingEngine;
+import org.bgi.flexlab.gaea.tools.haplotypecaller.HaplotypeCallerEngine;
 import org.bgi.flexlab.gaea.tools.genotyer.annotator.VariantAnnotatorEngine;
 import org.seqdoop.hadoop_bam.KeyIgnoringVCFOutputFormat;
 import org.seqdoop.hadoop_bam.VariantContextWritable;
-
 import java.io.IOException;
-
 import static org.bgi.flexlab.gaea.framework.tools.mapreduce.WindowsBasedMapper.REFERENCE_REGION;
 
 /**
@@ -65,7 +63,7 @@ public class HaplotypeCaller extends ToolsRunner {
         //vcf header
         conf.set(GaeaVCFOutputFormat.OUT_PATH_PROP, options.getVCFHeaderOutput() + "/vcfFileHeader.vcf");
         VariantAnnotatorEngine variantAnnotatorEngine = new VariantAnnotatorEngine(options.getAnnotationGroups(), options.getAnnotations(), null);
-        VCFHeader vcfHeader = VariantCallingEngine.getVCFHeader(options, variantAnnotatorEngine, SamHdfsFileHeader.getHeader(conf));
+        VCFHeader vcfHeader = HaplotypeCallerEngine.getVCFHeader(options, variantAnnotatorEngine, SamHdfsFileHeader.getHeader(conf));
         VCFHdfsWriter vcfHdfsWriter = new VCFHdfsWriter(conf.get(GaeaVCFOutputFormat.OUT_PATH_PROP), false, false, conf);
         vcfHdfsWriter.writeHeader(vcfHeader);
         vcfHdfsWriter.close();
