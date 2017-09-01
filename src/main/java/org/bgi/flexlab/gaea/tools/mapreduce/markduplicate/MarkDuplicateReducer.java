@@ -8,6 +8,7 @@ import org.apache.hadoop.mapreduce.Reducer;
 import org.bgi.flexlab.gaea.data.mapreduce.input.header.SamHdfsFileHeader;
 import org.bgi.flexlab.gaea.data.mapreduce.writable.DuplicationKeyWritable;
 import org.bgi.flexlab.gaea.data.mapreduce.writable.SamRecordWritable;
+import org.bgi.flexlab.gaea.data.structure.bam.GaeaSamRecord;
 import org.bgi.flexlab.gaea.tools.markduplicate.MarkDuplicatesFunc;
 
 import java.io.IOException;
@@ -27,12 +28,9 @@ public class MarkDuplicateReducer extends Reducer<DuplicationKeyWritable, SamRec
         //deal unmapped reads
         if(key.getChrIndex() == -1) {
             for(SamRecordWritable s : values) {
-                SAMRecord sam = s.get();
-                int referenceIndex = sam.getReferenceIndex();
-                sam.setHeader(samHeader);
+            	GaeaSamRecord sam = new GaeaSamRecord(samHeader,s.get());
                 SamRecordWritable w = new SamRecordWritable();
                 w.set(sam);
-                sam.setReferenceIndex(referenceIndex);
                 context.write(NullWritable.get(), w);
             }
             return;
@@ -42,11 +40,8 @@ public class MarkDuplicateReducer extends Reducer<DuplicationKeyWritable, SamRec
         ArrayList<SAMRecord> sams = new ArrayList<>();
         int n = 0;
         for(SamRecordWritable s : values) {
-            SAMRecord sam=s.get();
-            int referenceIndex = sam.getReferenceIndex();
-            sam.setHeader(samHeader);
-            sam.setReferenceIndex(referenceIndex);
-            if (n>5000) {
+        	GaeaSamRecord sam = new GaeaSamRecord(samHeader,s.get());
+            if (n>100000) {
                 sam.setDuplicateReadFlag(true);
                 SamRecordWritable w = new SamRecordWritable();
                 w.set(sam);
